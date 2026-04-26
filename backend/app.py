@@ -12,7 +12,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 app = Flask(__name__)
 CORS(app)
 
-N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/shieldai-alert"
+# N8N Webhook URL for email alerts
+N8N_WEBHOOK_URL = "https://varshadev.app.n8n.cloud/webhook-test/42e49342-9eda-41ff-b95a-189ab77879ca"
 SQLITE_DB_PATH = Path(__file__).with_name("cybershield_ai.db")
 DB_INIT_ERROR = None
 DB_BACKEND = None
