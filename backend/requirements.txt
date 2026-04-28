@@ -4,3 +4,4 @@ flask-cors
 psycopg[binary]
 requests
 werkzeug
+gunicorn
