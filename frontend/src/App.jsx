@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './App.css'
 
 const API_BASE_URL = 'https://cybershield-ai-backend.onrender.com/'
@@ -40,6 +40,18 @@ function App() {
     { time: '12am', activity: inputs.behavior > 60 ? 83 : 42 },
     { time: '02am', activity: inputs.behavior > 80 ? 97 : 53 },
     { time: '04am', activity: 31 },
+  ]
+
+  const pieData = [
+    { name: 'Low Risk', value: 45, color: '#10b981' },
+    { name: 'Medium Risk', value: 30, color: '#f59e0b' },
+    { name: 'High Risk', value: 25, color: '#ef4444' },
+  ]
+
+  const activityLog = [
+    { time: '2:30 PM', event: 'High Risk Profile Detected' },
+    { time: '2:31 PM', event: 'Alert Email Sent to Admin' },
+    { time: '2:32 PM', event: 'User Notification Dispatched' },
   ]
 
   const updateInput = (key) => (event) => {
@@ -104,6 +116,20 @@ function App() {
     setResult(null)
     setAuthMode('login')
     setAuthMessage('')
+  }
+
+  const simulateStalkerAttack = () => {
+    setInputs({
+      behavior: 95,
+      nlp: 92,
+      network: 98,
+      url: inputs.url || 'instagr.am/spy_user',
+    })
+    setResult({
+      score: 93,
+      status: 'Stalker Attack Detected',
+      reasons: ['High behavior risk', 'Rapid NLP escalation', 'Suspicious network activity'],
+    })
   }
 
   const analyzeData = async () => {
@@ -201,7 +227,6 @@ function App() {
               <div className="visual-chip chip-b">Security</div>
               <div className="visual-chip chip-c">Insights</div>
             </div>
-
           </section>
 
           <section className="panel auth-panel">
@@ -296,7 +321,6 @@ function App() {
       <div className="app-background">
         <div className="bg-glow glow-1" />
         <div className="bg-glow glow-2" />
-        <div className="bg-grid" />
       </div>
 
       <header className="hero-panel dashboard-hero">
@@ -338,7 +362,7 @@ function App() {
 
           <div className="control-group">
             <div className="slider-label">
-              <span>Behavior Risk</span>
+              <span>🧠 Behavior Risk</span>
               <span>{inputs.behavior}%</span>
             </div>
             <input className="range-input" type="range" min="0" max="100" value={inputs.behavior} onChange={updateInput('behavior')} />
@@ -346,7 +370,7 @@ function App() {
 
           <div className="control-group">
             <div className="slider-label">
-              <span>NLP/Text Risk</span>
+              <span>💬 NLP/Text Risk</span>
               <span>{inputs.nlp}%</span>
             </div>
             <input className="range-input" type="range" min="0" max="100" value={inputs.nlp} onChange={updateInput('nlp')} />
@@ -354,7 +378,7 @@ function App() {
 
           <div className="control-group">
             <div className="slider-label">
-              <span>Network Risk</span>
+              <span>🌐 Network Risk</span>
               <span>{inputs.network}%</span>
             </div>
             <input className="range-input" type="range" min="0" max="100" value={inputs.network} onChange={updateInput('network')} />
@@ -362,6 +386,9 @@ function App() {
 
           <button className="button-primary" onClick={analyzeData} type="button" disabled={loading}>
             {loading ? 'ANALYZING...' : 'RUN REAL-TIME ANALYSIS'}
+          </button>
+          <button className="button-secondary" onClick={simulateStalkerAttack}>
+            DUALITY SIMULATION
           </button>
         </section>
 
@@ -415,6 +442,7 @@ function App() {
               )}
 
               {result.score > 70 && <div className="alert-banner">High-risk alert forwarded to n8n</div>}
+              {result.score > 70 && <div className="alert-banner">🚨 n8n alert sent to victim</div>}
             </div>
           ) : (
             <div className="results-card placeholder">
@@ -517,6 +545,52 @@ function App() {
           </section>
         )}
       </main>
+
+      <section className="dashboard-footer">
+        <div className="panel activity-log-panel">
+          <div className="panel-heading">
+            <span className="panel-badge">Activity log</span>
+            <h2>Recent events</h2>
+            <p>Latest security activities and alerts.</p>
+          </div>
+          <ul className="activity-list">
+            {activityLog.map((item, index) => (
+              <li key={index} className="activity-item">
+                <span className="activity-time">{item.time}</span>
+                <span className="activity-event">{item.event}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="panel weekly-analysis-panel">
+          <div className="panel-heading">
+            <span className="panel-badge">Weekly analysis</span>
+            <h2>Threat distribution</h2>
+            <p>Overview of risk levels this week.</p>
+          </div>
+          <div className="pie-chart-container">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={60}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

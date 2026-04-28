@@ -2,18 +2,33 @@ import os
 import sqlite3
 from pathlib import Path
 
-import psycopg
+from dotenv import load_dotenv
+import psycopg2 as psycopg
+import psycopg2.extras
 import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from psycopg.rows import dict_row
 from werkzeug.security import check_password_hash, generate_password_hash
+from google import genai
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 # N8N Webhook URL for email alerts
 N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/shieldai-alert"
+# Configure Google Gemini AI
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    genai_client = None
+    print("Warning: GEMINI_API_KEY environment variable not set. Gemini AI features will not work.")
+
+# N8N Webhook URL for email alerts
+N8N_WEBHOOK_URL = "https://varshadev.app.n8n.cloud/webhook-test/42e49342-9eda-41ff-b95a-189ab77879ca"
 SQLITE_DB_PATH = Path(__file__).with_name("cybershield_ai.db")
 DB_INIT_ERROR = None
 DB_BACKEND = None
@@ -34,7 +49,7 @@ def get_database_url():
 
 
 def get_postgres_connection():
-    return psycopg.connect(get_database_url(), row_factory=dict_row, connect_timeout=3)
+    return psycopg.connect(get_database_url(), cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=3)
 
 
 def get_sqlite_connection():
@@ -252,6 +267,34 @@ def login():
     )
 
 
+def get_gemini_reasoning(behavior_input, nlp_input, network_input, url, score, status):
+    if not genai_client:
+        return "Gemini AI not configured. Using default reasoning."
+    
+    try:
+        prompt = f"""
+        Analyze the following cybersecurity risk data and provide a brief, concise reason for the risk assessment:
+
+        - Behavior Score: {behavior_input}/100
+        - NLP Score: {nlp_input}/100  
+        - Network Score: {network_input}/100
+        - URL: {url}
+        - Overall Risk Score: {score}/100
+        - Risk Status: {status}
+
+        Provide a short explanation (1-2 sentences) explaining why this activity might be risky or safe, focusing on patterns like unusual timing, suspicious keywords, or network behavior.
+        """
+        response = genai_client.models.generate_content(
+            model='models/gemini-flash-latest',
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        app.logger.error(f"Gemini API error: {str(e)}")
+        print(f"Gemini API error: {str(e)}", flush=True)
+        return "Unable to generate AI reasoning due to API error. Please verify your Gemini model configuration and API access."
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     data = request.get_json(silent=True) or {}
@@ -273,7 +316,14 @@ def analyze():
     status = "Safe"
     if score > 70:
         status = "High Risk"
-        reasons.append("Night activity spikes detected")
+    elif score > 30:
+        status = "Suspicious"
+
+    # Use Gemini for AI-powered reasoning
+    ai_reason = get_gemini_reasoning(behavior_input, final_nlp, network_input, url, score, status)
+    reasons.append(ai_reason)
+
+    if score > 70:
         try:
             requests.post(
                 N8N_WEBHOOK_URL,
@@ -282,8 +332,6 @@ def analyze():
             )
         except requests.RequestException:
             pass
-    elif score > 30:
-        status = "Suspicious"
 
     return jsonify(
         {
