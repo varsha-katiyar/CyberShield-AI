@@ -9,7 +9,7 @@ import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
-from google import genai
+
 
 # Load environment variables from .env file
 load_dotenv()
