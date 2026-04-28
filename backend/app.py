@@ -346,7 +346,7 @@ def health():
         {
             "status": "ok",
             "database": DB_BACKEND or "not-configured",
-            "database_error": DB_INIT_ERROR,
+           "database_error": None if DB_BACKEND == "sqlite" else DB_INIT_ERROR
         }
     )
 
