@@ -3,7 +3,7 @@ import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import './App.css'
 
-const API_BASE_URL = 'http://127.0.0.1:5000'
+const API_BASE_URL = 'https://cybershield-ai-backend.onrender.com/'
 const AUTH_STORAGE_KEY = 'cybershield-user'
 
 const emptyAuthForm = {
@@ -20,6 +20,9 @@ function App() {
   const [user, setUser] = useState(null)
   const [inputs, setInputs] = useState({ behavior: 50, nlp: 50, network: 50, url: '' })
   const [result, setResult] = useState(null)
+  const [aiRecommendations, setAiRecommendations] = useState(null)
+  const [urlAssessment, setUrlAssessment] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const storedUser = localStorage.getItem(AUTH_STORAGE_KEY)
@@ -104,6 +107,9 @@ function App() {
   }
 
   const analyzeData = async () => {
+    setLoading(true)
+    setAiRecommendations(null)
+    setUrlAssessment(null)
     try {
       const response = await axios.post(`${API_BASE_URL}/analyze`, {
         behavior_input: inputs.behavior,
@@ -112,8 +118,51 @@ function App() {
         url: inputs.url,
       })
       setResult(response.data)
+
+      // Get AI recommendations - always try to get them
+      try {
+        const threatLevel = response.data.ai_analysis?.overall_risk_level || 
+                           (response.data.score > 70 ? 'high' : response.data.score > 30 ? 'medium' : 'low')
+        
+        const recResponse = await axios.post(`${API_BASE_URL}/ai/recommendations`, {
+          threat_level: threatLevel,
+          threat_details: response.data.ai_analysis || {
+            risk_score: response.data.score,
+            status: response.data.status
+          },
+        })
+        
+        // Use recommendations from response, regardless of success status
+        if (recResponse.data && recResponse.data.recommendations) {
+          setAiRecommendations(recResponse.data.recommendations)
+          console.log('Recommendations loaded:', recResponse.data.recommendations)
+        }
+      } catch (err) {
+        console.error('AI recommendations error:', {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data
+        })
+      }
+
+      // Assess URL if provided
+      if (inputs.url && inputs.url.trim()) {
+        try {
+          const urlResponse = await axios.post(`${API_BASE_URL}/ai/assess-url`, {
+            url: inputs.url,
+          })
+          if (urlResponse.data.success && urlResponse.data.assessment) {
+            setUrlAssessment(urlResponse.data.assessment)
+          }
+        } catch (err) {
+          console.error('URL assessment error:', err.message)
+        }
+      }
     } catch (error) {
+      console.error('Analysis error:', error)
       alert('Backend not connected. Please start python app.py and try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -311,8 +360,8 @@ function App() {
             <input className="range-input" type="range" min="0" max="100" value={inputs.network} onChange={updateInput('network')} />
           </div>
 
-          <button className="button-primary" onClick={analyzeData} type="button">
-            RUN REAL-TIME ANALYSIS
+          <button className="button-primary" onClick={analyzeData} type="button" disabled={loading}>
+            {loading ? 'ANALYZING...' : 'RUN REAL-TIME ANALYSIS'}
           </button>
         </section>
 
@@ -347,6 +396,24 @@ function App() {
               <p className="result-copy">
                 <strong>Reasoning:</strong> {result.reasons.join(', ')}
               </p>
+              
+              {result.ai_powered && result.ai_analysis && (
+                <div className="ai-insights-box">
+                  <p className="ai-badge">🤖 AI-Powered Analysis</p>
+                  <div className="ai-detail">
+                    <strong>Risk Level:</strong> {result.ai_analysis.overall_risk_level?.toUpperCase() || 'N/A'}
+                  </div>
+                  <div className="ai-detail">
+                    <strong>AI Risk Score:</strong> {result.ai_analysis.risk_score || result.score}%
+                  </div>
+                  {result.ai_analysis.threat_indicators && result.ai_analysis.threat_indicators.length > 0 && (
+                    <div className="ai-detail">
+                      <strong>Indicators:</strong> {result.ai_analysis.threat_indicators.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {result.score > 70 && <div className="alert-banner">High-risk alert forwarded to n8n</div>}
             </div>
           ) : (
@@ -355,6 +422,100 @@ function App() {
             </div>
           )}
         </section>
+
+        <section className="panel ai-recommendations-panel">
+          <div className="panel-heading">
+            <span className="panel-badge">AI Recommendations</span>
+            <h2>Security Actions</h2>
+            <p>AI-powered recommendations to mitigate risks.</p>
+          </div>
+
+          {aiRecommendations ? (
+            <div className="recommendations-box">
+              {aiRecommendations.immediate_actions && aiRecommendations.immediate_actions.length > 0 && (
+                <div className="recommendation-section">
+                  <h4>⚡ Immediate Actions</h4>
+                  <ul>
+                    {aiRecommendations.immediate_actions.map((action, idx) => (
+                      <li key={idx}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiRecommendations.preventive_measures && aiRecommendations.preventive_measures.length > 0 && (
+                <div className="recommendation-section">
+                  <h4>🛡️ Preventive Measures</h4>
+                  <ul>
+                    {aiRecommendations.preventive_measures.map((measure, idx) => (
+                      <li key={idx}>{measure}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiRecommendations.monitoring_suggestions && aiRecommendations.monitoring_suggestions.length > 0 && (
+                <div className="recommendation-section">
+                  <h4>👁️ Monitoring Suggestions</h4>
+                  <ul>
+                    {aiRecommendations.monitoring_suggestions.map((suggestion, idx) => (
+                      <li key={idx}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="results-card placeholder">
+              <p>Run analysis to get AI recommendations.</p>
+            </div>
+          )}
+        </section>
+
+        {urlAssessment && (
+          <section className="panel url-assessment-panel">
+            <div className="panel-heading">
+              <span className="panel-badge">URL Assessment</span>
+              <h2>Domain Safety</h2>
+              <p>AI analysis of the provided URL.</p>
+            </div>
+
+            <div className="url-assessment-box">
+              <div className="safety-score">
+                <span className="score-label">Safety Score</span>
+                <div className="score-bar">
+                  <div 
+                    className={`score-fill ${urlAssessment.risk_level === 'safe' ? 'safe' : urlAssessment.risk_level === 'warning' ? 'warning' : 'dangerous'}`}
+                    style={{ width: `${urlAssessment.safety_score || 0}%` }}
+                  />
+                </div>
+                <span className="score-value">{urlAssessment.safety_score || 0}/100</span>
+              </div>
+
+              {urlAssessment.concerns && urlAssessment.concerns.length > 0 && (
+                <div className="assessment-section">
+                  <h4>⚠️ Concerns</h4>
+                  <ul>
+                    {urlAssessment.concerns.map((concern, idx) => (
+                      <li key={idx}>{concern}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {urlAssessment.recommendations && urlAssessment.recommendations.length > 0 && (
+                <div className="assessment-section">
+                  <h4>Recommendations</h4>
+                  <ul>
+                    {urlAssessment.recommendations.map((rec, idx) => (
+                      <li key={idx}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )
