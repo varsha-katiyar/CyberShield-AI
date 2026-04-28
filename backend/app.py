@@ -8,16 +8,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from psycopg.rows import dict_row
 from werkzeug.security import check_password_hash, generate_password_hash
-from dotenv import load_dotenv
-
-from ai_service import get_ai_service
-
-# Load environment variables from .env file
-load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
+# N8N Webhook URL for email alerts
 N8N_WEBHOOK_URL = "http://localhost:5678/webhook-test/shieldai-alert"
 SQLITE_DB_PATH = Path(__file__).with_name("cybershield_ai.db")
 DB_INIT_ERROR = None
@@ -190,100 +185,6 @@ def create_user(full_name, email, password_hash):
         return cur.fetchone()
 
 
-def _get_fallback_recommendations(threat_level: str) -> dict:
-    """Generate fallback recommendations when AI service is unavailable"""
-    threat_level = str(threat_level).lower().strip()
-    
-    recommendations = {
-        "critical": {
-            "immediate_actions": [
-                "Isolate affected system from network immediately",
-                "Preserve forensic evidence and initiate incident response",
-                "Notify security team and stakeholders",
-                "Activate business continuity procedures"
-            ],
-            "preventive_measures": [
-                "Implement additional network segmentation and monitoring",
-                "Strengthen multi-factor authentication",
-                "Conduct immediate security audit and patch management",
-                "Deploy advanced threat detection systems"
-            ],
-            "monitoring_suggestions": [
-                "Enable 24/7 monitoring on critical systems",
-                "Track all access and anomalous behavior patterns",
-                "Set up real-time alerting for similar threats",
-                "Review and strengthen incident response procedures"
-            ],
-            "risk_explanation": "Critical threat requires immediate action to prevent system compromise."
-        },
-        "high": {
-            "immediate_actions": [
-                "Conduct detailed threat assessment and analysis",
-                "Implement temporary security controls",
-                "Document all findings and evidence",
-                "Prepare incident response and mitigation plan"
-            ],
-            "preventive_measures": [
-                "Apply security patches and updates",
-                "Strengthen access controls and authentication",
-                "Increase system monitoring and logging",
-                "Review and update security policies"
-            ],
-            "monitoring_suggestions": [
-                "Increase monitoring frequency on affected systems",
-                "Track recurring threat patterns and indicators",
-                "Review security logs and audit trails daily",
-                "Conduct regular incident response drills"
-            ],
-            "risk_explanation": "High-level threat requires prompt investigation and mitigation actions."
-        },
-        "medium": {
-            "immediate_actions": [
-                "Investigate threat source and nature",
-                "Document findings and impact assessment",
-                "Consider and implement security updates",
-                "Review user access permissions"
-            ],
-            "preventive_measures": [
-                "Keep systems updated with latest patches",
-                "Implement security best practices",
-                "Conduct security awareness training",
-                "Review and strengthen access controls"
-            ],
-            "monitoring_suggestions": [
-                "Monitor system performance and activity",
-                "Review security logs on regular schedule",
-                "Track security metrics and trends",
-                "Test backup and recovery procedures"
-            ],
-            "risk_explanation": "Medium-level threat should be addressed with standard security measures."
-        },
-        "low": {
-            "immediate_actions": [
-                "Continue monitoring the situation",
-                "Apply routine security updates",
-                "Document observations for records",
-                "Maintain standard security practices"
-            ],
-            "preventive_measures": [
-                "Maintain current security posture",
-                "Apply updates and patches as scheduled",
-                "Continue security training programs",
-                "Keep security policies updated"
-            ],
-            "monitoring_suggestions": [
-                "Continue standard system monitoring",
-                "Review logs as per normal schedule",
-                "Maintain security hygiene practices",
-                "Track overall system health"
-            ],
-            "risk_explanation": "Low-level threat - maintain standard security practices and monitoring."
-        }
-    }
-    
-    return recommendations.get(threat_level, recommendations["medium"])
-
-
 @app.route("/auth/register", methods=["POST"])
 def register():
     if not db_ready():
@@ -384,109 +285,22 @@ def analyze():
     elif score > 30:
         status = "Suspicious"
 
-    # Get AI analysis from Gemini
-    ai_analysis = None
-    ai_service = get_ai_service()
-    if ai_service:
-        ai_result = ai_service.analyze_threat(
-            behavior_input, nlp_input, network_input, url
-        )
-        if ai_result.get("success"):
-            ai_analysis = ai_result.get("threat_analysis")
-
     return jsonify(
         {
             "score": score,
             "status": status,
             "reasons": reasons if reasons else ["No immediate threat"],
-            "ai_analysis": ai_analysis,
-            "ai_powered": ai_analysis is not None,
         }
     )
 
 
-
-
-@app.route("/ai/recommendations", methods=["POST"])
-def get_ai_recommendations():
-    """Get AI-powered security recommendations based on threat analysis"""
-    data = request.get_json(silent=True) or {}
-    threat_level = data.get("threat_level", "medium")
-    threat_details = data.get("threat_details", {})
-
-    ai_service = get_ai_service()
-    if not ai_service:
-        # Return fallback recommendations when AI service is not available
-        fallback_recs = _get_fallback_recommendations(threat_level)
-        return jsonify({
-            "success": False,
-            "error": "AI service not configured, using fallback recommendations.",
-            "recommendations": fallback_recs,
-        })
-
-    result = ai_service.generate_security_recommendations(threat_level, threat_details)
-    # Ensure we always return recommendations
-    if not result.get("recommendations"):
-        result["recommendations"] = _get_fallback_recommendations(threat_level)
-    return jsonify(result)
-
-
-@app.route("/ai/explain-anomaly", methods=["POST"])
-def explain_anomaly():
-    """Get AI-powered explanation of detected anomalies"""
-    data = request.get_json(silent=True) or {}
-    anomaly_data = data.get("anomaly_data", {})
-
-    ai_service = get_ai_service()
-    if not ai_service:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "AI service not configured. Set GOOGLE_API_KEY environment variable.",
-                }
-            ),
-            503,
-        )
-
-    explanation = ai_service.explain_anomaly(anomaly_data)
-    return jsonify({"success": True, "explanation": explanation})
-
-
-@app.route("/ai/assess-url", methods=["POST"])
-def assess_url():
-    """Get AI-powered URL safety assessment"""
-    data = request.get_json(silent=True) or {}
-    url = data.get("url", "")
-
-    if not url:
-        return jsonify({"success": False, "error": "URL is required"}), 400
-
-    ai_service = get_ai_service()
-    if not ai_service:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "AI service not configured. Set GOOGLE_API_KEY environment variable.",
-                }
-            ),
-            503,
-        )
-
-    result = ai_service.assess_url_safety(url)
-    return jsonify(result)
-
-
 @app.route("/health", methods=["GET"])
 def health():
-    ai_service = get_ai_service()
     return jsonify(
         {
             "status": "ok",
             "database": DB_BACKEND or "not-configured",
             "database_error": DB_INIT_ERROR,
-            "ai_service": "available" if ai_service else "not-configured",
         }
     )
 
@@ -495,4 +309,4 @@ init_db()
 
 
 if __name__ == "__main__":
-   app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    app.run(debug=True, port=5000)
