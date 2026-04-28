@@ -3,7 +3,7 @@ import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './App.css'
 
-const API_BASE_URL = 'http://127.0.0.1:5000'
+const API_BASE_URL = 'https://cybershield-ai-backend.onrender.com'
 const AUTH_STORAGE_KEY = 'cybershield-user'
 
 const emptyAuthForm = {
