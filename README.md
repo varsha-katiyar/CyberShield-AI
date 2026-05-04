@@ -110,6 +110,7 @@ Our microservices architecture ensures scalability and modularity:
 5. **Access the Application**
    - Frontend: `http://localhost:5173`
    - Backend API: `http://localhost:5000`
+   - deployment link: https://cyber-shield-ai-ten.vercel.app/
 
 ## 🎯 Usage Guide
 
