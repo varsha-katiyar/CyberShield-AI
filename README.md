@@ -225,7 +225,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Contact
 
 **CyberShield AI Team**
-- Email: team@cybershield.ai
+
 - GitHub: [@cybershield-ai](https://github.com/cybershield-ai)
 
 ---
